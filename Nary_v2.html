@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <title>N-ary | Texture Engine</title>
+    <style>
+        body { background: #020202; color: #00ff88; font-family: 'Courier New', monospace; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        #editor { flex: 1; background: transparent; color: #00ff88; border: none; padding: 25px; font-size: 16px; outline: none; resize: none; line-height: 1.6; }
+        #viz { height: 20%; background: #000; border-top: 1px solid #111; }
+        .bar { background: #000; padding: 15px; display: flex; justify-content: space-between; border-bottom: 1px solid #111; }
+        button { background: #00ff88; color: #000; border: none; padding: 10px 20px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="bar">
+    <button onclick="initNary()">RENDER TEXTURE (Ctrl+Enter)</button>
+    <div style="font-size: 12px; opacity: 0.5;">N-ARY // HARMONIC DENSITY MODE</div>
+</div>
+
+<textarea id="editor" spellcheck="false">
+// N-ARY: TEXTURA D'HARMÒNICS (ZERO CLICKS)
+// Prova de canviar el pitch de 0 a 7 o 12
+
+nuvol > source triangle
+  rate 15
+  density 80
+  size 1200ms
+  pitch 0
+  fine_detune 8 drift 5s
+  space 0.9
+  focus micro
+
+guspires > source sine
+  rate 2
+  activity 0.4
+  pitch 24
+  size 50ms
+  space 0.2
+  focus macro
+</textarea>
+
+<canvas id="viz"></canvas>
+
+<script>
+let audioCtx, masterGain, verb;
+let runningFluxes = {};
+
+async function initNary() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.3;
+
+        // Reverb més densa per "lligar" els grans
+        verb = audioCtx.createConvolver();
+        const length = audioCtx.sampleRate * 4;
+        const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
+        for (let i = 0; i < 2; i++) {
+            const chan = impulse.getChannelData(i);
+            for (let j = 0; j < length; j++) {
+                chan[j] = (Math.random() * 2 - 1) * Math.pow(1 - j / length, 3);
+            }
+        }
+        verb.buffer = impulse;
+        masterGain.connect(verb);
+        verb.connect(audioCtx.destination);
+        masterGain.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    updateEngine();
+}
+
+function updateEngine() {
+    const lines = document.getElementById('editor').value.split('\n');
+    let currentId = null;
+    let newSettings = {};
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//')) return;
+        if (line.includes('>')) {
+            currentId = line.split('>')[0].trim();
+            newSettings[currentId] = { params: {} };
+        } else if (currentId && line.startsWith('  ')) {
+            const [attr, val] = trimmed.split(/\s+/);
+            newSettings[currentId].params[attr] = val;
+        }
+    });
+    Object.keys(newSettings).forEach(id => {
+        if (!runningFluxes[id]) runningFluxes[id] = createFluxInstance(id, newSettings[id]);
+        else runningFluxes[id].update(newSettings[id].params);
+    });
+}
+
+function createFluxInstance(id, data) {
+    let params = data.params;
+    let intervalId = null;
+
+    const tick = () => {
+        const now = audioCtx.currentTime;
+        const dur = params.size ? parseFloat(params.size) / 1000 : 0.5;
+        
+        // SÈRIE D'HARMÒNICS (Això crea la textura)
+        const harmonics = [1, 2, 3, 1.5]; // Fonamental, Octava, Duodècima, Quinta
+        
+        harmonics.forEach((h, i) => {
+            const osc = audioCtx.createOscillator();
+            const env = audioCtx.createGain();
+            const f = audioCtx.createBiquadFilter();
+
+            f.type = "lowpass";
+            f.frequency.value = (1 - (params.space || 0.5)) * 3000 + 100;
+
+            osc.type = params.source || 'sine';
+            const baseFreq = 110 * Math.pow(2, (parseFloat(params.pitch) || 0) / 12);
+            osc.frequency.setValueAtTime(baseFreq * h, now);
+            osc.detune.setValueAtTime((Math.random() - 0.5) * (parseFloat(params.fine_detune) || 0), now);
+
+            // ENVOLUPANT ANTI-CLICK (S-Curve)
+            env.gain.setValueAtTime(0, now);
+            env.gain.linearRampToValueAtTime(0.1 / (i + 1), now + dur * 0.4);
+            env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+            osc.connect(f); f.connect(env); env.connect(masterGain);
+            osc.start(now); osc.stop(now + dur);
+        });
+    };
+
+    const start = () => {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = setInterval(tick, 1000 / (parseFloat(params.rate) || 1));
+    };
+    start();
+    return { update: (p) => { params = p; } };
+}
+
+document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') initNary(); });
+</script>
+</body>
+</html>
