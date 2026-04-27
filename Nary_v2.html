@@ -40,6 +40,10 @@
           (Ex: 'space' de Flux A controlat per l'activitat de Flux B).
       [ ] MACRO/MICRO FOCUS: Refinar la transició entre els dos modes 
           com una interpolació suau d'envolupants.
+
+[] control + punt stop
+[] quan reevalues s'elimina el sinte 
+[] drag and drop samples
   ===========================================================
 */
 </script>
@@ -71,6 +75,7 @@
 
 nuvol > source triangle
   rate 15
+  jitter 0.05    // 50ms de variació aleatòria
   density 80
   size 1200ms
   pitch 0
@@ -118,24 +123,54 @@ async function initNary() {
     updateEngine();
 }
 
+
+// Llegeix el text de l'editor i actualitza l'estat del motor de so.
 function updateEngine() {
+    // 1. Obtenim tot el text de l'àrea de l'editor i el dividim en un array de línies
     const lines = document.getElementById('editor').value.split('\n');
-    let currentId = null;
-    let newSettings = {};
+    
+    let currentId = null;   // Variable per saber quin so estem editant actualment
+    let newSettings = {};   // Objecte on guardarem la configuració temporal
+
     lines.forEach(line => {
+        // Netegem els espais buits al principi i al final de la línia
         const trimmed = line.trim();
+        
+        // Si la línia està buida o comença amb // (comentari), la ignorem
         if (!trimmed || trimmed.startsWith('//')) return;
+
+        // Si la línia conté el símbol '>', hem trobat el nom d'un flux (Ex: ona >)
         if (line.includes('>')) {
+            // Extraiem el nom (el que hi ha abans del '>') i li treiem els espais
             currentId = line.split('>')[0].trim();
+            // Creem una entrada nova a newSettings per a aquest so amb els seus paràmetres buits
             newSettings[currentId] = { params: {} };
-        } else if (currentId && line.startsWith('  ')) {
-            const [attr, val] = trimmed.split(/\s+/);
-            newSettings[currentId].params[attr] = val;
+        } 
+        
+        // Si la línia comença amb un espai o un tabulador, és un atribut d'un flux
+        else if (currentId && (line.startsWith(' ') || line.startsWith('\t'))) {
+            // Dividim la línia per espais: parts[0] és l'atribut, parts[1] és el valor
+            const parts = trimmed.split(/\s+/);
+            const attr = parts[0]; // Ex: "jitter"
+            const val = parts[1];  // Ex: "0.05"
+            
+            // Si tenim tant l'atribut com el valor, els guardem al flux actual
+            if (attr && val) {
+                newSettings[currentId].params[attr] = val;
+            }
         }
     });
+
+    // 2. Un cop llegit tot el text, sincronitzem els sons que estan sonant
     Object.keys(newSettings).forEach(id => {
-        if (!runningFluxes[id]) runningFluxes[id] = createFluxInstance(id, newSettings[id]);
-        else runningFluxes[id].update(newSettings[id].params);
+        // Si el so NO existia abans (és nou), creem una instància nova de so
+        if (!runningFluxes[id]) {
+            runningFluxes[id] = createFluxInstance(id, newSettings[id]);
+        } 
+        // Si el so JA existia, simplement li enviem els paràmetres nous (com el jitter o el pitch)
+        else {
+            runningFluxes[id].update(newSettings[id].params);
+        }
     });
 }
 
@@ -144,33 +179,45 @@ function createFluxInstance(id, data) {
     let intervalId = null;
 
     const tick = () => {
-        const now = audioCtx.currentTime;
-        const dur = params.size ? parseFloat(params.size) / 1000 : 0.5;
-        
-        // SÈRIE D'HARMÒNICS (Això crea la textura)
-        const harmonics = [1, 2, 3, 1.5]; // Fonamental, Octava, Duodècima, Quinta
-        
-        harmonics.forEach((h, i) => {
-            const osc = audioCtx.createOscillator();
-            const env = audioCtx.createGain();
-            const f = audioCtx.createBiquadFilter();
+        // Calcularem un retard aleatori basat en el paràmetre 'jitter'
+        // Si jitter és 0, el retard és 0.
+        const jitterAmount = parseFloat(params.jitter) || 0;
+        const randomDelay = Math.random() * jitterAmount * 1000; // convertit a ms
 
-            f.type = "lowpass";
-            f.frequency.value = (1 - (params.space || 0.5)) * 3000 + 100;
+        setTimeout(() => {
+            if (params.activity && Math.random() > parseFloat(params.activity)) return;
 
-            osc.type = params.source || 'sine';
-            const baseFreq = 110 * Math.pow(2, (parseFloat(params.pitch) || 0) / 12);
-            osc.frequency.setValueAtTime(baseFreq * h, now);
-            osc.detune.setValueAtTime((Math.random() - 0.5) * (parseFloat(params.fine_detune) || 0), now);
+            const now = audioCtx.currentTime;
+            const dur = params.size ? parseFloat(params.size) / 1000 : 0.5;
+            
+            // --- AQUÍ VA LA TEVA LÒGICA D'HARMÒNICS QUE JA TENIES ---
+            const harmonics = [1, 2, 3, 1.5];
+            harmonics.forEach((h, i) => {
+                const osc = audioCtx.createOscillator();
+                const env = audioCtx.createGain();
+                const f = audioCtx.createBiquadFilter();
 
-            // ENVOLUPANT ANTI-CLICK (S-Curve)
-            env.gain.setValueAtTime(0, now);
-            env.gain.linearRampToValueAtTime(0.1 / (i + 1), now + dur * 0.4);
-            env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+                f.type = "lowpass";
+                f.frequency.value = (1 - (parseFloat(params.space) || 0.5)) * 3000 + 100;
 
-            osc.connect(f); f.connect(env); env.connect(masterGain);
-            osc.start(now); osc.stop(now + dur);
-        });
+                osc.type = params.source || 'sine';
+                // Afegim el jitter també al pitch per a més realisme orgànic si vols
+                const baseFreq = 110 * Math.pow(2, (parseFloat(params.pitch) || 0) / 12);
+                osc.frequency.setValueAtTime(baseFreq * h, now);
+                
+                // Apliquem el fine_detune
+                osc.detune.setValueAtTime((Math.random() - 0.5) * (parseFloat(params.fine_detune) || 0), now);
+
+                env.gain.setValueAtTime(0, now);
+                env.gain.linearRampToValueAtTime(0.1 / (i + 1), now + dur * 0.4);
+                env.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+
+                osc.connect(f); f.connect(env); env.connect(masterGain);
+                osc.start(now); osc.stop(now + dur);
+            });
+            // -------------------------------------------------------
+
+        }, randomDelay); // Aquí apliquem el retard del jitter
     };
 
     const start = () => {
@@ -186,21 +233,7 @@ function createFluxInstance(id, data) {
 
 document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') initNary(); });
 
-// // Bottom visuals
-// const canvas = document.getElementById('viz');
-// const ctx = canvas.getContext('2d');
-// function draw() {
-//     canvas.width = window.innerWidth; canvas.height = window.innerHeight * 0.25;
-//     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0,0, canvas.width, canvas.height);
-//     Object.keys(runningFluxes).forEach((id, i) => {
-//         ctx.strokeStyle = i % 2 === 0 ? '#00ff88' : '#0088ff';
-//         ctx.beginPath();
-//         ctx.arc(canvas.width/2, canvas.height/2, (Math.random() * 100) + i*20, 0, Math.PI*2);
-//         ctx.stroke();
-//     });
-//     requestAnimationFrame(draw);
-// }
-// draw();
+
 
 // --- SISTEMA VISUAL N-ARY ---
 const canvas = document.getElementById('viz');
