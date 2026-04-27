@@ -1,3 +1,50 @@
+<script>
+/* ===========================================================
+  N-ARY ENGINE: TO-DO LIST (ROADMAP DE DESENVOLUPAMENT)
+  ===========================================================
+
+  [ ] 1. AUDIO ENGINE: FIDELITAT I FÍSICA
+      [ ] Implementar PINK NOISE: El 'source noise' actual és blanc. 
+          Necessitem un filtre de 1/f per a textures orgàniques.
+      [ ] LFO MODULATION ENGINE: Fer que 'cycle' i 'drift' realment 
+          modifiquin els paràmetres en temps real (AudioParam automation).
+      [ ] TRUE JITTER: Afegir el paràmetre 'jitter' per desplaçar el start-time 
+          de cada gra aleatòriament (actualment el rate és massa rítmic).
+      [ ] FEEDBACK DELAY NETWORK: Millorar el 'space' perquè no sigui només 
+          convolució, sinó una cua que es retroalimenta infinitament.
+
+  [ ] 2. TONALITAT: MICROTONALITAT NATIVA
+      [ ] TUNING TABLES: Crear un diccionari amb sistemes reals 
+          (31-TET, 19-TET, Pythagorean, Just Intonation).
+      [ ] SCALE LOCKING: Implementar la funció 'scale' per forçar que 
+          els 'step' i 'pitch' caiguin sempre en ràtios harmòniques.
+      [ ] POLYPHONIC FLUX: Permetre que un sol flux 'N-ary' generi 
+          acords complexos si es defineixen múltiples ràtios al pitch.
+
+  [ ] 3. INTERFÍCIE (UI/UX)
+      [ ] SYNTAX HIGHLIGHTING: Afegir colors al textarea perquè es 
+          distingeixin 'source', 'pitch', i els valors numèrics.
+      [ ] FILE DROP SOURCE: Permetre arrossegar un .wav/.mp3 per usar-lo 
+          com a buffer en lloc de només oscil·ladors (Essencial Microcosm).
+      [ ] HOLOGRAPHIC VISUALIZER: Que el canvas reaccioni realment a la 
+          freqüència i densitat de cada flux de forma independent.
+
+  [ ] 4. OPTIMITZACIÓ (ELIMINACIÓ DEFINITIVA DE CLICKS)
+      [ ] AUDIO WORKLET: Moure tot el càlcul de grans a un fil separat (Worker). 
+          setInterval() és poc precís i és el culpable dels micro-clicks rítmics.
+      [ ] ZERO-CROSSING DETECTION: Que el gra només s'inicii quan l'ona 
+          està a zero per evitar transitoris agressius.
+
+  [ ] 5. SISTEMA N-ary (LÒGICA PROPIA)
+      [ ] INTERFERÈNCIA: Que un flux pugui modular-ne un altre 
+          (Ex: 'space' de Flux A controlat per l'activitat de Flux B).
+      [ ] MACRO/MICRO FOCUS: Refinar la transició entre els dos modes 
+          com una interpolació suau d'envolupants.
+  ===========================================================
+*/
+</script>
+
+
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -131,10 +178,95 @@ function createFluxInstance(id, data) {
         intervalId = setInterval(tick, 1000 / (parseFloat(params.rate) || 1));
     };
     start();
-    return { update: (p) => { params = p; } };
+    return { 
+    update: (p) => { params = p; },
+    getParams: () => params 
+    };
 }
 
 document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') initNary(); });
+
+// // Bottom visuals
+// const canvas = document.getElementById('viz');
+// const ctx = canvas.getContext('2d');
+// function draw() {
+//     canvas.width = window.innerWidth; canvas.height = window.innerHeight * 0.25;
+//     ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.fillRect(0,0, canvas.width, canvas.height);
+//     Object.keys(runningFluxes).forEach((id, i) => {
+//         ctx.strokeStyle = i % 2 === 0 ? '#00ff88' : '#0088ff';
+//         ctx.beginPath();
+//         ctx.arc(canvas.width/2, canvas.height/2, (Math.random() * 100) + i*20, 0, Math.PI*2);
+//         ctx.stroke();
+//     });
+//     requestAnimationFrame(draw);
+// }
+// draw();
+
+// --- SISTEMA VISUAL N-ARY ---
+const canvas = document.getElementById('viz');
+const ctx = canvas.getContext('2d');
+
+function draw() {
+    // Ajustar tamany del canvas
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight * 0.25;
+    const centerY = canvas.height / 2;
+    const bufferHeight = canvas.height * 0.3;
+
+    // Fons negre amb estela (per veure el moviment)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Dibuixem cada flux actiu
+    const fluxKeys = Object.keys(runningFluxes);
+    
+    fluxKeys.forEach((id, index) => {
+        const flux = runningFluxes[id];
+        const params = flux.getParams(); // Necessitem accedir als paràmetres actuals
+        
+        // 1. Dibuixar l'ona base (Buffer estàtic per ara)
+        ctx.strokeStyle = index % 2 === 0 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(0, 136, 255, 0.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x < canvas.width; x++) {
+            // Generem una ona visualment complexa per simular un buffer real
+            let drift = Math.sin(Date.now() * 0.001 + index);
+            let y = centerY + Math.sin(x * 0.02 + drift) * Math.cos(x * 0.005) * bufferHeight;
+            if (x === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // 2. Dibuixar el "Punter de Lectura" i el Gra
+        const grainSizeMs = parseFloat(params.size) || 100;
+        const visualWidth = (grainSizeMs / 1000) * 300; // Amplada segons durada
+        
+        // Calculem una posició simulada que depèn del 'rate'
+        let speed = (parseFloat(params.rate) || 1) * 0.001;
+        let playhead = (Date.now() * speed * (index + 1)) % canvas.width;
+
+        // Finestra del Gra (Holograma)
+        const grad = ctx.createLinearGradient(playhead - visualWidth/2, 0, playhead + visualWidth/2, 0);
+        grad.addColorStop(0, 'rgba(0, 255, 136, 0)');
+        grad.addColorStop(0.5, index % 2 === 0 ? 'rgba(0, 255, 136, 0.4)' : 'rgba(0, 136, 255, 0.4)');
+        grad.addColorStop(1, 'rgba(0, 255, 136, 0)');
+        
+        ctx.fillStyle = grad;
+        ctx.fillRect(playhead - visualWidth/2, centerY - bufferHeight, visualWidth, bufferHeight * 2);
+
+        // 3. Etiqueta
+        ctx.fillStyle = index % 2 === 0 ? '#00ff88' : '#0088ff';
+        ctx.font = '9px Courier New';
+        ctx.fillText(`${id.toUpperCase()} | RATE:${params.rate} | SIZE:${grainSizeMs}ms`, playhead - visualWidth/2, centerY - bufferHeight - 5);
+    });
+
+    requestAnimationFrame(draw);
+}
+
+// Llançar l'animació
+draw();
+
 </script>
 </body>
 </html>
+
