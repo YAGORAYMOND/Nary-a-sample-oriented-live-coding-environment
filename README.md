@@ -16,7 +16,7 @@ Inspired by boutique pedals like the *Hologram Microcosm*, this engine focuses o
 
 ---
 
-## 📜 Language Syntax
+## 📄 Language Syntax
 
 The language is based on **Fluxes**. A flux is defined by a name followed by the `>` symbol and a list of indented attributes.
 ```n-ary
@@ -41,7 +41,7 @@ cloud_name > source triangle
  
 ## 🤓⌨️ Examples
 1. Atmospheric Cloud (Ambient Pad)
-A soft, deep texture that evolves slowly.
+  A soft, deep texture that evolves slowly.
 ```
 atmosphere > source sine
   rate 12
@@ -51,3 +51,29 @@ atmosphere > source sine
   reverb 0.95
   fine_detune 15
 ```
+2. Electric Sparks (Glitchy)
+  Short, high-pitched sounds with random rhythmic cuts.
+```
+sparks > source triangle
+  rate 4
+  activity 0.3
+  grain 40ms
+  pitch 24
+  reverb 0.2
+```
+
+3. Deep Detuned Bass
+  A solid sound with organic movement.
+```
+bass > source sawtooth
+  rate 20
+  grain 800ms
+  pitch -24
+  fine_detune 30
+  reverb 0.4
+```
+## 📜 License
+Project created for sonic experimentation. Free to use and modify.
+
+
+
