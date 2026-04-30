@@ -68,7 +68,7 @@ sparks > source triangle
 bass > source sawtooth
   rate 20
   grain 800ms
-  pitch -24
+  pitch -2
   fine_detune 30
   reverb 0.4
 ```
