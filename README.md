@@ -1,2 +1,53 @@
-# Nary-a-sample-oriented-live-coding-environment
- A sample-oriented live coding environment
+# 〰️ N-ARY | Texture Engine
+
+**N-ARY** is a web-based live coding environment for harmonic granular synthesis. It allows users to generate organic sound textures, sonic clouds, and microtonal atmospheres using a minimalist and intuitive programming language.
+
+Inspired by boutique pedals like the *Hologram Microcosm*, this engine focuses on "controlled imperfection" and harmonic richness.
+
+---
+
+## 🔊 Getting Started
+
+1. Download the `N-ary.html` file and open it in any web browser.
+2. Type your code in the editor.
+3. Press **`Ctrl + Enter`** to **render** or update the sound.
+4. Press **`Ctrl + .`** to **stop** the engine.
+5. ENJOY!
+
+---
+
+## 📜 Language Syntax
+
+The language is based on **Fluxes**. A flux is defined by a name followed by the `>` symbol and a list of indented attributes.
+```n-ary
+cloud_name > source triangle
+  rate 10
+  grain 500ms
+
+````
+## 🎛️ Functions & Attributes
+
+| Attribute | Description | Recommended Values |
+| ---- | --- | --- |
+| **source** | The base waveform of the generator. | `sine`, `triangle`, `sawtooth`, `square` |
+| **rate** | How many grains are generated per second (speed). | `1` to `60` |
+| **grain** | The duration of each individual sound fragment. | `10ms` to `5000ms` |
+| **jitter** | Temporal chaos. Randomly offsets the start of each grain. | `0` to `0.5` |
+| **pitch** | Transposition of the base note (in semitones). | `-24` to `24` |
+| **fine_detune** | Fine pitch adjustment to create "chorus" or thickness. | `0` to `50` |
+| **reverb** | Spatial depth and filter darkness. | `0` (dry) to `1.0` (infinite) |
+| **activity** | Probability of a grain being triggered. | `0` to `1.0` |
+
+ 
+## 🤓⌨️ Examples
+1. Atmospheric Cloud (Ambient Pad)
+A soft, deep texture that evolves slowly.
+```
+atmosphere > source sine
+  rate 12
+  grain 1500ms
+  jitter 0.1
+  pitch -12
+  reverb 0.95
+  fine_detune 15
+```
