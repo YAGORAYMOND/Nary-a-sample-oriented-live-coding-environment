@@ -1,4 +1,4 @@
-# 〰️ N-ARY | Texture Engine
+# 〰️ N-ARY | A granular synthesis live coding envirnoment
 
 **N-ARY** is a web-based live coding environment for harmonic granular synthesis. It allows users to generate organic sound textures, sonic clouds, and microtonal atmospheres using a minimalist and intuitive programming language.
 
